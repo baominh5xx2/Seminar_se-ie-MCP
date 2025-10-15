@@ -6,6 +6,7 @@ MCP (Model Context Protocol) Server cho AI Assistant, được xây dựng với
 
 - ✅ **FastMCP**: Framework hiện đại cho MCP server
 - ✅ **Tools**: Các công cụ để tương tác với AI agent backend
+- ✅ **Weather Tool**: Lấy thông tin thời tiết thời gian thực 🌤️
 - ✅ **Resources**: Truy cập thông tin agent và conversations
 - ✅ **Prompts**: Các prompt templates có sẵn
 - ✅ **Async Support**: Hoàn toàn asynchronous
@@ -52,7 +53,10 @@ Cập nhật file `.env`:
 ```env
 BACKEND_API_URL=http://localhost:8000
 OPENAI_API_KEY=your_key_here
+WEATHER_API_KEY=your_openweathermap_key_here  # Optional - for weather tool
 ```
+
+> **Note:** Weather tool hoạt động ngay cả khi không có `WEATHER_API_KEY`. Nó sẽ tự động dùng wttr.in (miễn phí). API key chỉ cần thiết nếu muốn độ chính xác cao hơn.
 
 ## 🚀 Chạy MCP Server
 
@@ -103,6 +107,16 @@ uv run server.py --reload
    - Kiểm tra sức khỏe backend API
    - Không cần tham số
 
+7. **get_current_weather** 🌤️
+   - Lấy thông tin thời tiết hiện tại cho một thành phố
+   - Tham số: `city` (bắt buộc), `country_code` (optional), `units` (optional)
+   - Ví dụ: `get_current_weather("Hanoi", "VN", "metric")`
+
+8. **get_weather_forecast** 🌦️
+   - Lấy dự báo thời tiết 1-5 ngày
+   - Tham số: `city` (bắt buộc), `country_code` (optional), `days` (1-5), `units` (optional)
+   - Ví dụ: `get_weather_forecast("Ho Chi Minh", "VN", 3)`
+
 ### Resources (Tài nguyên)
 
 1. **agent://info**
@@ -135,11 +149,34 @@ result = await client.call_tool(
     }
 )
 
+# Lấy thông tin thời tiết 🌤️
+weather = await client.call_tool(
+    "get_current_weather",
+    arguments={
+        "city": "Hanoi",
+        "country_code": "VN",
+        "units": "metric"
+    }
+)
+
 # Lấy thông tin agent
 info = await client.read_resource("agent://info")
 
 # Sử dụng prompt
 messages = await client.get_prompt("technical_help")
+```
+
+### Demo Weather Tool
+
+```bash
+# Chạy demo thời tiết
+python3 demo_weather.py
+
+# Hoặc chế độ tương tác
+python3 demo_weather.py interactive
+
+# Test
+python3 tests/test_weather_tools.py
 ```
 
 ### Cấu hình trong Claude Desktop
@@ -214,12 +251,30 @@ uv run server.py
 
 ```
 MCP/
-├── server.py              # Main MCP server file
-├── pyproject.toml         # Project configuration (uv/pip)
-├── .env                   # Environment variables
-├── .env.example           # Example env file
-├── README.md              # Documentation
-└── .gitignore            # Git ignore rules
+├── server.py                    # Main MCP server file
+├── pyproject.toml               # Project configuration (uv/pip)
+├── .env                         # Environment variables
+├── .env.example                 # Example env file
+├── README.md                    # Documentation (this file)
+├── WEATHER_SETUP.md             # 🌤️ Weather tool detailed guide
+├── QUICKSTART_VI.md             # 🌤️ Vietnamese quick start
+├── INSTALL.md                   # Installation guide
+├── WEATHER_SUMMARY.md           # 🌤️ Weather tool summary
+├── demo_weather.py              # 🌤️ Weather demo script
+├── src/
+│   └── mcp_server/
+│       ├── tools/
+│       │   ├── chat_tools.py    # Chat tools
+│       │   ├── agent_tools.py   # Agent tools
+│       │   └── weather_tools.py # 🌤️ Weather tools
+│       ├── resources/           # MCP resources
+│       ├── prompts/             # Prompt templates
+│       ├── core/                # Core configuration
+│       └── utils/               # Utilities
+├── tests/
+│   ├── test_chat_tools.py
+│   └── test_weather_tools.py    # 🌤️ Weather tests
+└── .gitignore
 ```
 
 ## 🔧 Phát triển thêm
@@ -271,9 +326,20 @@ async def your_prompt() -> List[Dict[str, str]]:
 
 ## 📚 Tài liệu
 
+### General:
 - [FastMCP Documentation](https://github.com/jlowin/fastmcp)
 - [MCP Specification](https://spec.modelcontextprotocol.io/)
 - [UV Documentation](https://docs.astral.sh/uv/)
+
+### Weather Tool Documentation:
+- 🌤️ [**QUICKSTART_VI.md**](QUICKSTART_VI.md) - Hướng dẫn nhanh tiếng Việt
+- 🌤️ [**WEATHER_SETUP.md**](WEATHER_SETUP.md) - Chi tiết đầy đủ (EN + VN)
+- 🌤️ [**WEATHER_SUMMARY.md**](WEATHER_SUMMARY.md) - Tóm tắt và architecture
+- 🌤️ [**INSTALL.md**](INSTALL.md) - Hướng dẫn cài đặt chi tiết
+
+### Weather API:
+- [OpenWeatherMap API](https://openweathermap.org/api) - Primary API (optional)
+- [wttr.in](https://wttr.in/) - Fallback API (no key needed)
 
 ## 🐛 Troubleshooting
 

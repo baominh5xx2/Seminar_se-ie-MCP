@@ -1,0 +1,6 @@
+mcp[cli]
+openai-agents
+requests
+python-dotenv
+pytz
+fastmcp
