@@ -20,6 +20,121 @@ def register_booking_tools(mcp: FastMCP):
     """Register booking-related tools"""
     
     @mcp.tool()
+    async def create_user(
+        user_phone: str,
+        full_name: str,
+        email: str
+    ) -> Dict[str, Any]:
+        """
+        Tạo user mới trong hệ thống
+        
+        Args:
+            user_phone: Số điện thoại user
+            full_name: Tên đầy đủ của user
+            email: Email của user 
+            
+        Returns:
+            Thông tin user đã tạo
+        """
+        try:
+            supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            
+            # Check if user already exists
+            existing_user = supabase.table("users")\
+                .select("*")\
+                .eq("phone_number", user_phone)\
+                .execute()
+            
+            if existing_user.data and len(existing_user.data) > 0:
+                return {
+                    "success": False,
+                    "error": "Số điện thoại này đã được đăng ký trong hệ thống",
+                    "user": existing_user.data[0]
+                }
+            
+            # Create new user
+            new_user = {
+                "phone_number": user_phone,
+                "full_name": full_name,
+                "email": email
+            }
+            
+            user_response = supabase.table("users").insert(new_user).execute()
+            
+            if not user_response.data:
+                return {
+                    "success": False,
+                    "error": "Không thể tạo user profile"
+                }
+            
+            return {
+                "success": True,
+                "message": "Tạo tài khoản thành công!",
+                "user": user_response.data[0]
+            }
+        
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Lỗi: {str(e)}"
+            }
+    
+    @mcp.tool()
+    async def check_user_exists(user_phone: str) -> Dict[str, Any]:
+        """
+        Kiểm tra user có tồn tại trong hệ thống hay chưa
+        
+        QUAN TRỌNG: Tool này PHẢI được gọi ngay sau khi user cung cấp số điện thoại và TRƯỚC KHI hỏi thêm bất kỳ thông tin booking nào khác.
+        
+        Flow đúng:
+        1. User cung cấp SĐT → Gọi tool này NGAY
+        2. Nếu user_exists = false → Hỏi tên đầy đủ → Gọi create_user
+        3. Nếu user_exists = true → Tiếp tục hỏi số người, ngày đi, etc.
+        
+        Args:
+            user_phone: Số điện thoại cần kiểm tra
+            
+        Returns:
+            Thông tin user nếu tồn tại, hoặc yêu cầu tạo user mới
+        """
+        try:
+            supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+            
+            user_response = supabase.table("users")\
+                .select("*")\
+                .eq("phone_number", user_phone)\
+                .execute()
+            
+            if not user_response.data or len(user_response.data) == 0:
+                return {
+                    "success": True,
+                    "user_exists": False,
+                    "message": f"Số điện thoại {user_phone} chưa có trong hệ thống.",
+                    "action_required": "Hỏi tên đầy đủ của khách hàng để tạo tài khoản.",
+                    "next_step": "Sau khi có tên, gọi tool 'create_user' để tạo tài khoản trước khi tiếp tục đặt tour."
+                }
+            
+            user = user_response.data[0]
+            return {
+                "success": True,
+                "user_exists": True,
+                "user": {
+                    "user_id": user['user_id'],
+                    "full_name": user['full_name'],
+                    "phone_number": user['phone_number'],
+                    "email": user.get('email')
+                },
+                "message": f"Chào mừng {user['full_name']}! Tài khoản đã tồn tại.",
+                "next_step": "Tiếp tục thu thập thông tin booking (số người, ngày đi, yêu cầu đặc biệt)."
+            }
+        
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Lỗi khi kiểm tra user: {str(e)}"
+            }
+    
+    @mcp.tool()
     async def create_booking(
         user_phone: str,
         package_id: str,
@@ -28,61 +143,58 @@ def register_booking_tools(mcp: FastMCP):
         special_requests: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Tạo booking mới cho user - YÊU CẦU THU THẬP ĐẦY ĐỦ THÔNG TIN TRƯỚC KHI GỌI
+        Tạo booking mới cho user
         
-        Trước khi gọi tool này, PHẢI thu thập đầy đủ:
-        - Số điện thoại (phone_number)
-        - Tour muốn đặt (package_id)
-        - Số người tham gia (number_of_people)
-        - Yêu cầu đặc biệt nếu có (special_requests)
+        QUY TRÌNH ĐẶT TOUR ĐÚNG:
+        Bước 1: User muốn đặt tour → Hỏi SỐ ĐIỆN THOẠI
+        Bước 2: Gọi tool 'check_user_exists' với số điện thoại
+        Bước 3a: Nếu user_exists = false:
+            - Hỏi TÊN ĐẦY ĐỦ và Email của khách hàng
+            - Gọi 'create_user' để tạo tài khoản
+        Bước 3b: Nếu user_exists = true:
+            - Chào mừng user (hiển thị tên)
+        Bước 4: Thu thập thông tin booking:
+            - Số người tham gia
+            - Ngày khởi hành
+            - Yêu cầu đặc biệt (nếu có)
+        Bước 5: Hiển thị bảng xác nhận đầy đủ, đợi user CONFIRM
+        Bước 6: Sau khi user confirm → Gọi tool này để tạo booking
         
-        Sau khi thu thập đủ, PHẢI gửi tin nhắn xác nhận cho user TRƯỚC KHI tạo booking:
-        "Xác nhận thông tin đặt tour:
-        - Tên khách hàng: [full_name]
-        - Tour: [tên tour]
-        - Điểm đi: [departure_location]
-        - Điểm đến: [destination]
-        - Số người: [X] người
-        - Ngày đi: [date]
-        - Tổng tiền: [amount] VNĐ
-        - Yêu cầu: [special_requests]
-        
-        Bạn có xác nhận đặt tour này không?"
+        QUAN TRỌNG: 
+        - Tool này CHỈ được gọi SAU KHI user đã CONFIRM booking
+        - User PHẢI đã tồn tại trong hệ thống (đã qua check_user_exists và create_user nếu cần)
+        - ĐÃ có đầy đủ thông tin: số người, ngày đi
         
         Args:
-            phone_number: Số điện thoại user
+            user_phone: Số điện thoại user (đã verified tồn tại)
             package_id: ID của tour package
             number_of_people: Số người tham gia
+            travel_date: Ngày khởi hành (YYYY-MM-DD)
             special_requests: Yêu cầu đặc biệt (optional)
             
         Returns:
-            Booking information với booking_id và OTP code
+            Booking confirmation, booking_id thông tin cơ bản của user (full_name, phone_number) và chi tiết đầy đủ
         """
         try:
             supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
             
-            # 1. Check if user exists, if not create user profile
+            # 1. Check if user exists
             user_response = supabase.table("users")\
                 .select("*")\
                 .eq("phone_number", user_phone)\
                 .execute()
             
             if not user_response.data or len(user_response.data) == 0:
-                # Create new user with phone number
-                new_user = {
-                    "phone_number": user_phone,
-                    "full_name": user_phone,  # Temporary, will be updated later
-                    "created_at": datetime.now().isoformat()
+                # User doesn't exist - return request for user creation
+                return {
+                    "success": False,
+                    "error": "user_not_found",
+                    "message": f"Số điện thoại {user_phone} chưa được đăng ký trong hệ thống.",
+                    "action_required": "create_user",
+                    "instruction": "Vui lòng hỏi tên đầy đủ của khách hàng và sử dụng tool 'create_user' để tạo tài khoản trước khi đặt tour."
                 }
-                user_create_response = supabase.table("users").insert(new_user).execute()
-                if not user_create_response.data:
-                    return {
-                        "success": False,
-                        "error": "Không thể tạo user profile"
-                    }
-                user = user_create_response.data[0]
-            else:
-                user = user_response.data[0]
+            
+            user = user_response.data[0]
             
             # 2. Get package info
             package_response = supabase.table("tour_packages")\
@@ -148,6 +260,8 @@ def register_booking_tools(mcp: FastMCP):
                 "message": "✅ ĐẶT TOUR THÀNH CÔNG!",
                 "confirmation": {
                     "booking_id": booking['booking_id'],
+                    "user_name": user['full_name'],
+                    "user_phone": user['phone_number'],
                     "tour_name": package['package_name'],
                     "destination": package['destination'],
                     "travel_date": travel_date,
