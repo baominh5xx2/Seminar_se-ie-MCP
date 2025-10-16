@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     
     # Weather API Configuration
     WEATHER_API_KEY: str = Field(
-        default="231783af55a5c399df3b94edaa86d763",
+        default=YOUR_WEATHER_API_KEY,
         description="OpenWeatherMap API key (get free key at https://openweathermap.org/api)"
     )
     
