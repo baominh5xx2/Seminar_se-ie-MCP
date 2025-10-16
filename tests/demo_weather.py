@@ -1,7 +1,13 @@
 import asyncio
+import sys
+from pathlib import Path
+from datetime import datetime
+
+# Add parent directory to path to import from src
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from src.mcp_server.core.config import settings
 from src.mcp_server.tools.weather_tools import WeatherService
-from datetime import datetime
 
 
 async def test_current_weather(weather_service: WeatherService):
@@ -13,10 +19,6 @@ async def test_current_weather(weather_service: WeatherService):
     
     Args:
         weather_service (WeatherService): An instance of WeatherService
-        
-    Example:
-        >>> weather_service = WeatherService()
-        >>> await test_current_weather(weather_service)
     """
     print("📍 Testing Current Weather")
     print("-" * 60)
@@ -56,11 +58,8 @@ async def test_weather_forecast(weather_service: WeatherService):
     
     Args:
         weather_service (WeatherService): An instance of WeatherService
-        
-    Example:
-        >>> weather_service = WeatherService()
-        >>> await test_weather_forecast(weather_service)
     """
+
     print("=" * 60)
     print("📅 Testing Weather Forecast")
     print("-" * 60)
@@ -68,7 +67,7 @@ async def test_weather_forecast(weather_service: WeatherService):
     # Define test cities and forecast days
     test_cases = [
         ("Ho Chi Minh", "Thành phố Hồ Chí Minh", 3),
-        ("Hanoi", "Hà Nội", 5),
+        ("Hanoi", "Hà Nội", 3),
     ]
     
     # Test forecast for each city
@@ -155,4 +154,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
