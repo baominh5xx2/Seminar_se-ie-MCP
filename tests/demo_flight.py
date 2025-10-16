@@ -4,6 +4,12 @@ Demonstrates the FlightService functionality
 """
 
 import asyncio
+import sys
+from pathlib import Path
+
+# Add parent directory to path to import from src
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from src.mcp_server.tools.flight_tools import FlightService
 
 
@@ -16,11 +22,11 @@ async def search_vietnam_flights():
     
     # Demo 1: Hanoi to Ho Chi Minh City
     print("\n" + "=" * 70)
-    print("🔎 Demo 1: Tìm chuyến bay Hà Nội → Sài Gòn")
+    print("🔎 Demo 1: Tìm chuyến bay Sài Gòn → Hà Nội")
     print("=" * 70)
     result = await flight_service.search_flights(
-        departure_iata="HAN",  # Hanoi
-        arrival_iata="SGN",    # Ho Chi Minh City
+        departure_iata="SGN",  # Hanoi
+        arrival_iata="HAN",    # Ho Chi Minh City
         limit=5,               # Show 5 flights
         future_only=True       # Only show future flights
     )
@@ -38,13 +44,25 @@ async def search_vietnam_flights():
     )
     print(result)
     
-    # Demo 3: Ho Chi Minh City to Singapore
+    # Demo 3: Ho Chi Minh City to Tokyo (Narita)
     print("\n\n" + "=" * 70)
-    print("🔎 Demo 3: Tìm chuyến bay Sài Gòn → Singapore")
+    print("🔎 Demo 3: Tìm chuyến bay Sài Gòn → Tokyo (Narita)")
     print("=" * 70)
     result = await flight_service.search_flights(
         departure_iata="SGN",  # Ho Chi Minh City
-        arrival_iata="SIN",    # Singapore
+        arrival_iata="NRT",    # Tokyo Narita
+        limit=5,               # Show 5 flights
+        future_only=True       # Only show future flights
+    )
+    print(result)
+    
+    # Demo 4: Ho Chi Minh City to Osaka
+    print("\n\n" + "=" * 70)
+    print("🔎 Demo 4: Tìm chuyến bay Sài Gòn → Osaka")
+    print("=" * 70)
+    result = await flight_service.search_flights(
+        departure_iata="SGN",  # Ho Chi Minh City
+        arrival_iata="KIX",    # Osaka Kansai
         limit=5,               # Show 5 flights
         future_only=True       # Only show future flights
     )
@@ -59,3 +77,4 @@ if __name__ == "__main__":
     print("\n" + "=" * 70)
     print("✅ Demo completed!")
     print("=" * 70 + "\n")
+

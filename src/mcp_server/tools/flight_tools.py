@@ -77,7 +77,7 @@ class FlightService:
         except Exception:
             return dt_string
     
-    def _format_flight_info(self, flight_data: Dict[str, Any]) -> str:
+    def _format_flight_info(self, flight_data: Dict[str, Any], index: int = 0, total: int = 0) -> str:
         """
         Format a single flight data object into readable string.
         
@@ -86,6 +86,8 @@ class FlightService:
         
         Args:
             flight_data (Dict[str, Any]): Flight data dictionary from API
+            index (int): Current flight index (1-based)
+            total (int): Total number of flights
             
         Returns:
             str: Formatted flight information string
@@ -113,8 +115,11 @@ class FlightService:
         arr_gate = arrival.get("gate", "N/A")
         arr_scheduled = self._format_datetime(arrival.get("scheduled"))
         
-        # Format output string with detailed date information
-        result = f"✈️  Flight: {flight_number} ({airline_name})\n"
+        # Format output string with detailed date information and flight header
+        result = f"Flight {index}/{total}\n" if total > 0 else ""
+        result += "─" * 60 + "\n" if total > 0 else ""
+        result += f"✈️  Flight: {flight_number} ({airline_name})\n"
+        
         # Parse and format flight date with detailed information
         try:
             if flight_date != "N/A":
@@ -135,7 +140,7 @@ class FlightService:
         result += f"🛫 Departure:\n"
         result += f"   • Airport: {dep_airport} ({dep_iata})\n"
         result += f"   • Terminal: {dep_terminal}, Gate: {dep_gate}\n"
-        result += f"   • Scheduled: {dep_scheduled}\n"
+        result += f"   • Scheduled Time: {dep_scheduled}\n"
         
         result += "\n"
         
@@ -143,7 +148,21 @@ class FlightService:
         result += f"🛬 Arrival:\n"
         result += f"   • Airport: {arr_airport} ({arr_iata})\n"
         result += f"   • Terminal: {arr_terminal}, Gate: {arr_gate}\n"
-        result += f"   • Scheduled: {arr_scheduled}\n"
+        result += f"   • Scheduled Time: {arr_scheduled}\n"
+        
+        # Calculate and display flight duration
+        try:
+            dep_time_str = departure.get("scheduled")
+            arr_time_str = arrival.get("scheduled")
+            if dep_time_str and arr_time_str:
+                dep_dt = datetime.fromisoformat(dep_time_str.replace('Z', '+00:00'))
+                arr_dt = datetime.fromisoformat(arr_time_str.replace('Z', '+00:00'))
+                duration = arr_dt - dep_dt
+                hours = int(duration.total_seconds() // 3600)
+                minutes = int((duration.total_seconds() % 3600) // 60)
+                result += f"   • Flight Duration: {hours}h {minutes}m\n"
+        except Exception:
+            pass
         
         # Add codeshare information if available
         codeshare = flight_data.get("flight", {}).get("codeshared")
@@ -159,7 +178,7 @@ class FlightService:
         departure_iata: str,
         arrival_iata: str,
         limit: int = 5,
-        future_only: bool = True
+        future_only: bool = False
     ) -> str:
         """
         Search for flights between two airports.
@@ -179,17 +198,23 @@ class FlightService:
 
         try:
             url = f"{self.base_url}/flights"
-            params = {
-                "access_key": self.api_key,
-                "dep_iata": departure_iata,
-                "arr_iata": arrival_iata,
-                "limit": limit,
-            }
-
+            
             # Get current date in Vietnam timezone
             current_time = datetime.now(self.vietnam_tz)
             today = current_time.strftime("%Y-%m-%d")
-            params["flight_date"] = today
+            
+            # API Optimization Strategy:
+            # 1. Make only ONE API call with a larger limit (100) to get more results at once
+            # 2. Use departure airport filter from API (supported in free tier)
+            # 3. Perform all other filtering locally to minimize API usage:
+            #    - Filter by arrival airport locally
+            #    - Filter future flights locally
+            #    - Apply user's limit locally
+            params = {
+                "access_key": self.api_key,
+                "dep_iata": departure_iata,
+                "limit": 100,  # Get more results to filter locally
+            }
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(url, params=params, timeout=15.0)
@@ -197,11 +222,23 @@ class FlightService:
                 data = response.json()
 
             if "error" in data:
-                return f"API Error: {data['error'].get('message', 'Unknown error')}"
+                error_info = data["error"]
+                error_msg = f"❌ API Error: {error_info.get('message', 'Unknown error')}\n"
+                error_msg += f"Code: {error_info.get('code', 'N/A')}\n"
+                error_msg += f"Type: {error_info.get('type', 'N/A')}\n"
+                if error_info.get('info'):
+                    error_msg += f"Info: {error_info.get('info')}"
+                return error_msg
 
-            flights = data.get("data", [])
+            all_flights = data.get("data", [])
             
-            if future_only:
+            # Filter by arrival airport
+            flights = [
+                flight for flight in all_flights
+                if flight.get("arrival", {}).get("iata") == arrival_iata
+            ]
+            
+            if future_only and flights:
                 # Filter future flights
                 future_flights = []
                 for flight in flights:
@@ -214,35 +251,51 @@ class FlightService:
                         except Exception:
                             continue
                 flights = future_flights
+            
+            # Apply the requested limit
+            flights = flights[:limit]
 
             if not flights:
-                message = f"No {'future ' if future_only else ''}flights found "
-                message += f"from {departure_iata} to {arrival_iata} for {today}.\n"
-                message += f"Please check:\n"
-                message += f"  • IATA codes are correct\n"
-                message += f"  • Route exists and has scheduled flights\n"
+                message = f"❌ No {'future ' if future_only else ''}flights found "
+                message += f"from {departure_iata} to {arrival_iata} for {today}.\n\n"
+                message += f"📝 Possible reasons:\n"
+                message += f"  • IATA codes are incorrect\n"
+                message += f"  • Route doesn't exist or has no scheduled flights today\n"
+                message += f"  • Free tier API may not include all international routes\n"
                 if future_only:
-                    message += f"  • Try searching for all flights (including past flights)\n"
-                message += f"  • Try different dates"
+                    message += f"  • All flights for today have already departed\n"
+                message += f"\n💡 Suggestions:\n"
+                message += f"  • Verify IATA codes (SGN=Ho Chi Minh, NRT=Tokyo Narita, HND=Tokyo Haneda)\n"
+                message += f"  • Try domestic routes (HAN, DAD, DLI, etc.)\n"
+                message += f"  • Check airline websites for international flights\n"
+                if future_only:
+                    message += f"  • Try searching all flights (set future_only=False)"
                 return message
 
             # Format output
-            result = f"🔍 Found {len(flights)} {'future ' if future_only else ''}flight(s)\n"
-            result += f"From: {departure_iata} → To: {arrival_iata}\n"
-            result += f"📅 Date: {today}\n"
-            result += f"⏰ All times shown in Vietnam timezone (UTC+7)\n"
-            result += "⏰ Times shown in Vietnam timezone (UTC+7)\n\n"
-            result += "=" * 60 + "\n\n"
+            result = f"✈️  Flight Search Results: {departure_iata} → {arrival_iata}\n"
+            result += f"{'=' * 60}\n"
+            result += f"📅 Search Date: {today}\n"
+            result += f"🔍 Found: {len(flights)} {'upcoming ' if future_only else ''}flight(s)\n"
+            if future_only:
+                result += f"⏰ Status: Showing only FUTURE flights (not yet departed)\n"
+            result += f"🌍 Timezone: Vietnam (UTC+7)\n"
+            result += f"{'=' * 60}\n\n"
 
             for i, flight in enumerate(flights, 1):
-                result += f"Flight {i}/{len(flights)}\n{'─'*60}\n"
-                result += self._format_flight_info(flight)
+                result += self._format_flight_info(flight, i, len(flights))
                 result += "\n\n"
 
             return result + "=" * 60
 
+        except httpx.HTTPStatusError as e:
+            return f"❌ HTTP Error {e.response.status_code}: {e.response.text}"
+        except httpx.TimeoutException:
+            return "❌ Request timeout: The API server took too long to respond. Please try again."
+        except httpx.RequestError as e:
+            return f"❌ Network Error: Failed to connect to the API. Details: {e}"
         except Exception as e:
-            return f"Unexpected error: {type(e).__name__} - {e}"
+            return f"❌ Unexpected error: {type(e).__name__} - {e}"
 
 
 
@@ -269,5 +322,19 @@ def register_flight_tools(mcp: FastMCP):
     ) -> str:
         """
         Search for flights between two airports for current day only.
+        Only returns future flights (not departed yet).
+        
+        Args:
+            departure_iata: Departure airport IATA code (e.g., HAN for Hanoi)
+            arrival_iata: Arrival airport IATA code (e.g., SGN for Ho Chi Minh)
+            limit: Maximum number of flights to return (default: 5)
+        
+        Returns:
+            Formatted flight information with complete departure and arrival times
         """
-        return await flight_service.search_flights(departure_iata, arrival_iata, limit)
+        return await flight_service.search_flights(
+            departure_iata=departure_iata,
+            arrival_iata=arrival_iata,
+            limit=limit,
+            future_only=True  # Always filter to show only future flights
+        )

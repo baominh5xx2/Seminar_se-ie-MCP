@@ -3,8 +3,25 @@ Core Configuration Module
 """
 import os
 from typing import Optional
+from pathlib import Path
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def find_project_root() -> Path:
+    """
+    Find the project root directory by looking for pyproject.toml or .git
+    This ensures .env is always found regardless of where the script is run from
+    """
+    current = Path(__file__).resolve()
+    
+    # Try to find project root by looking for marker files
+    for parent in [current] + list(current.parents):
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            return parent
+    
+    # Fallback: go 3 levels up from this file
+    return Path(__file__).resolve().parent.parent.parent.parent
 
 
 class Settings(BaseSettings):
@@ -27,13 +44,13 @@ class Settings(BaseSettings):
     
     # Weather API Configuration
     WEATHER_API_KEY: str = Field(
-        default="231783af55a5c399df3b94edaa86d763",
+        default="",
         description="OpenWeatherMap API key (get free key at https://openweathermap.org/api)"
     )
     
     # Flight API Configuration
     FLIGHT_API_KEY: str = Field(
-        default="deaae84979c204818d401f19ff261d7c",
+        default="",
         description="AviationStack API key (get free key at https://aviationstack.com/)"
     )
     
@@ -54,10 +71,13 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-        extra = "allow"
+    model_config = SettingsConfigDict(
+        # Dynamically find .env in project root
+        env_file=str(find_project_root() / ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="allow"
+    )
 
 
 # Global settings instance
