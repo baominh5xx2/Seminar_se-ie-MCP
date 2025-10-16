@@ -31,6 +31,12 @@ class Settings(BaseSettings):
         description="OpenWeatherMap API key (get free key at https://openweathermap.org/api)"
     )
     
+    # Flight API Configuration
+    FLIGHT_API_KEY: str = Field(
+        default="deaae84979c204818d401f19ff261d7c",
+        description="AviationStack API key (get free key at https://aviationstack.com/)"
+    )
+    
     # Google Drive Configuration (for document resources)
     GOOGLE_DRIVE_FOLDER_ID: Optional[str] = Field(
         default=None,
