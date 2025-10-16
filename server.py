@@ -4,10 +4,14 @@ Professional FastMCP implementation with modular architecture
 """
 from fastmcp import FastMCP
 from src.mcp_server.core.config import settings
-from src.mcp_server.tools import register_all_tools
+from src.mcp_server.utils import setup_logging
+
+# Import individual tool registrations
+from src.mcp_server.tools.booking_tools import register_booking_tools
+from src.mcp_server.tools.flight_tools import register_flight_tools
+from src.mcp_server.tools.weather_tools import register_weather_tools
 from src.mcp_server.resources import register_all_resources
 from src.mcp_server.prompts import register_all_prompts
-from src.mcp_server.utils import setup_logging
 
 # Setup logging
 logger = setup_logging(settings.LOG_LEVEL)
@@ -19,10 +23,24 @@ mcp = FastMCP(
     dependencies=["httpx", "pydantic", "pydantic-settings"]
 )
 
-# Register all components
+# ============================================================================
+# REGISTER TOOLS - Comment out tools you don't want to use
+# ============================================================================
 logger.info("Registering MCP tools...")
-register_all_tools(mcp)
 
+# Booking Tools (Tour search, booking management)
+register_booking_tools(mcp)
+
+# Flight Tools (Flight search) - Uncomment to enable
+register_flight_tools(mcp)
+
+# Weather Tools (Weather forecast) - Uncomment to enable
+register_weather_tools(mcp)
+
+
+# ============================================================================
+# REGISTER RESOURCES & PROMPTS
+# ============================================================================
 logger.info("Registering MCP resources...")
 register_all_resources(mcp)
 
