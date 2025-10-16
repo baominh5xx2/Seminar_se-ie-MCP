@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = Field(default=None, description="OpenAI API key")
     OPENAI_MODEL: str = Field(default="gpt-4-turbo-preview", description="OpenAI model")
     
+    # Weather API Configuration
+    WEATHER_API_KEY: str = Field(
+        default="231783af55a5c399df3b94edaa86d763",
+        description="OpenWeatherMap API key (get free key at https://openweathermap.org/api)"
+    )
+    
     # Google Drive Configuration (for document resources)
     GOOGLE_DRIVE_FOLDER_ID: Optional[str] = Field(
         default=None,
