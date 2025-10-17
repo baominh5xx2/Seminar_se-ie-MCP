@@ -97,12 +97,13 @@ async def sse_endpoint():
     """SSE endpoint for MCP protocol"""
     async def event_generator():
         # Send initial connection event
-        yield f"data: {{'type': 'connection', 'status': 'connected'}}\n\n"
+        yield "data: {'type': 'connection', 'status': 'connected'}\n\n"
         
         # Keep connection alive
         while True:
             # Send heartbeat every 30 seconds
-            yield f"data: {{'type': 'heartbeat', 'timestamp': '{os.getenv(\"RENDER_INSTANCE_ID\", \"local\")}'}}\n\n"
+            instance_id = os.getenv("RENDER_INSTANCE_ID", "local")
+            yield f"data: {{'type': 'heartbeat', 'timestamp': '{instance_id}'}}\n\n"
             await asyncio.sleep(30)
     
     return StreamingResponse(
