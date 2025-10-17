@@ -3,9 +3,11 @@ AI Assistant MCP Server
 Professional FastMCP implementation with modular architecture
 """
 import os
+import asyncio
 from fastmcp import FastMCP
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from src.mcp_server.core.config import settings
 from src.mcp_server.tools import register_all_tools
@@ -21,6 +23,15 @@ app = FastAPI(
     title=settings.SERVER_NAME,
     version=settings.SERVER_VERSION,
     description="AI Assistant MCP Server - HTTP Wrapper"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Initialize FastMCP server
@@ -80,6 +91,29 @@ async def server_info():
         "backend_api": settings.BACKEND_API_URL,
         "log_level": settings.LOG_LEVEL
     })
+
+@app.get("/sse")
+async def sse_endpoint():
+    """SSE endpoint for MCP protocol"""
+    async def event_generator():
+        # Send initial connection event
+        yield f"data: {{'type': 'connection', 'status': 'connected'}}\n\n"
+        
+        # Keep connection alive
+        while True:
+            # Send heartbeat every 30 seconds
+            yield f"data: {{'type': 'heartbeat', 'timestamp': '{os.getenv(\"RENDER_INSTANCE_ID\", \"local\")}'}}\n\n"
+            await asyncio.sleep(30)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
 
 
 def main():
