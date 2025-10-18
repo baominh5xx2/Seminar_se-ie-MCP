@@ -3,7 +3,14 @@ AI Assistant MCP Server
 Professional FastMCP implementation with modular architecture
 """
 import os
+import sys
 import asyncio
+from pathlib import Path
+
+# Add src directory to Python path
+ROOT_DIR = Path(__file__).parent
+sys.path.insert(0, str(ROOT_DIR))
+
 from fastmcp import FastMCP
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
