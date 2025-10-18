@@ -27,8 +27,7 @@ logger = setup_logging(settings.LOG_LEVEL)
 # ============================================================================
 mcp = FastMCP(
     name=settings.SERVER_NAME,
-    version=settings.SERVER_VERSION,
-    dependencies=["httpx", "pydantic", "pydantic-settings"]
+    version=settings.SERVER_VERSION
 )
 
 # ============================================================================
@@ -118,28 +117,33 @@ async def server_info():
 # ============================================================================
 def main():
     """Main entry point for the MCP server"""
-    # Check if running on Render (has PORT env var)
+    # Check if running on Render (has PORT env var) or force HTTP mode
     port = os.getenv("PORT")
     
+    # Always use HTTP mode (both local and Render)
     if port:
-        # Running on Render - use Streamable HTTP transport
-        logger.info(f"🚀 Starting {settings.SERVER_NAME} in Streamable HTTP mode (Render)...")
+        # Running on Render - use provided port
+        logger.info(f"🚀 Starting {settings.SERVER_NAME} in HTTP mode (Render)...")
         logger.info(f"Backend API: {settings.BACKEND_API_URL}")
         logger.info(f"Port: {port}")
         
-        # Run MCP with streamable-http transport
-        mcp.run(
-            transport="streamable-http",
+        uvicorn.run(
+            app,
             host="0.0.0.0",
             port=int(port)
         )
     else:
-        # Running locally - use stdio mode (standard MCP)
-        logger.info(f"🚀 Starting {settings.SERVER_NAME} in stdio mode (local)...")
+        # Running locally - use HTTP mode on port 8001
+        logger.info(f"🚀 Starting {settings.SERVER_NAME} in HTTP mode (local)...")
         logger.info(f"Backend API: {settings.BACKEND_API_URL}")
+        logger.info(f"Port: 8001")
         
-        # Run the MCP server in stdio mode
-        mcp.run(transport="stdio")
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8001,
+            log_level=settings.LOG_LEVEL.lower()
+        )
 
 
 if __name__ == "__main__":
