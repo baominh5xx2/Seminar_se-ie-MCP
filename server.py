@@ -3,29 +3,61 @@ AI Assistant MCP Server
 Professional FastMCP implementation with modular architecture
 """
 import os
-import sys
 import asyncio
-from pathlib import Path
-
-# Add src directory to Python path
-ROOT_DIR = Path(__file__).parent
-SRC_DIR = ROOT_DIR / "src"
-sys.path.insert(0, str(SRC_DIR))
-
 from fastmcp import FastMCP
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from mcp_server.core.config import settings
-from mcp_server.tools import register_all_tools
-from mcp_server.resources import register_all_resources
-from mcp_server.prompts import register_all_prompts
-from mcp_server.utils import setup_logging
+from src.mcp_server.core.config import settings
+from src.mcp_server.utils import setup_logging
+
+# Import individual tool registrations
+from src.mcp_server.tools.booking_tools import register_booking_tools
+from src.mcp_server.tools.flight_tools import register_flight_tools
+from src.mcp_server.tools.weather_tools import register_weather_tools
+from src.mcp_server.resources import register_all_resources
+from src.mcp_server.prompts import register_all_prompts
 
 # Setup logging
 logger = setup_logging(settings.LOG_LEVEL)
 
+# ============================================================================
+# Initialize FastMCP server
+# ============================================================================
+mcp = FastMCP(
+    name=settings.SERVER_NAME,
+    version=settings.SERVER_VERSION
+)
+
+# ============================================================================
+# REGISTER TOOLS - Comment out tools you don't want to use
+# ============================================================================
+logger.info("Registering MCP tools...")
+
+# Booking Tools (Tour search, booking management)
+register_booking_tools(mcp)
+
+# Flight Tools (Flight search) - Uncomment to enable
+register_flight_tools(mcp)
+
+# Weather Tools (Weather forecast) - Uncomment to enable
+register_weather_tools(mcp)
+
+# ============================================================================
+# REGISTER RESOURCES & PROMPTS
+# ============================================================================
+logger.info("Registering MCP resources...")
+register_all_resources(mcp)
+
+logger.info("Registering MCP prompts...")
+register_all_prompts(mcp)
+
+logger.info(f"✅ {settings.SERVER_NAME} v{settings.SERVER_VERSION} initialized successfully")
+
+# ============================================================================
+# HTTP Wrapper (Optional - for health checks on Render)
+# ============================================================================
 # Initialize FastAPI app for HTTP endpoints
 app = FastAPI(
     title=settings.SERVER_NAME,
@@ -42,25 +74,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize FastMCP server
-mcp = FastMCP(
-    name=settings.SERVER_NAME,
-    version=settings.SERVER_VERSION
-)
-
-# Register all components
-logger.info("Registering MCP tools...")
-register_all_tools(mcp)
-
-logger.info("Registering MCP resources...")
-register_all_resources(mcp)
-
-logger.info("Registering MCP prompts...")
-register_all_prompts(mcp)
-
-logger.info(f"✅ {settings.SERVER_NAME} v{settings.SERVER_VERSION} initialized successfully")
-
-# HTTP Endpoints for Render
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -99,31 +112,9 @@ async def server_info():
         "log_level": settings.LOG_LEVEL
     })
 
-@app.get("/sse")
-async def sse_endpoint():
-    """SSE endpoint for MCP protocol"""
-    async def event_generator():
-        # Send initial connection event
-        yield "data: {'type': 'connection', 'status': 'connected'}\n\n"
-        
-        # Keep connection alive
-        while True:
-            # Send heartbeat every 30 seconds
-            instance_id = os.getenv("RENDER_INSTANCE_ID", "local")
-            yield f"data: {{'type': 'heartbeat', 'timestamp': '{instance_id}'}}\n\n"
-            await asyncio.sleep(30)
-    
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
-
-
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
 def main():
     """Main entry point for the MCP server"""
     # Check if running on Render (has PORT env var) or force HTTP mode
@@ -139,8 +130,7 @@ def main():
         uvicorn.run(
             app,
             host="0.0.0.0",
-            port=int(port),
-            log_level=settings.LOG_LEVEL.lower()
+            port=int(port)
         )
     else:
         # Running locally - use HTTP mode on port 8001
