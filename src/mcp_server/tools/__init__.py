@@ -14,16 +14,12 @@ def register_all_tools(mcp: FastMCP):
     Args:
         mcp: FastMCP server instance
     """
-    register_chat_tools(mcp)
-    register_agent_tools(mcp)
     register_weather_tools(mcp)
     register_flight_tools(mcp)
     register_booking_tools(mcp)
 
 __all__ = [
     "register_all_tools",
-    "register_chat_tools",
-    "register_agent_tools",
     "register_weather_tools",
     "register_flight_tools",
     "register_booking_tools"
