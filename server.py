@@ -9,18 +9,19 @@ from pathlib import Path
 
 # Add src directory to Python path
 ROOT_DIR = Path(__file__).parent
-sys.path.insert(0, str(ROOT_DIR))
+SRC_DIR = ROOT_DIR / "src"
+sys.path.insert(0, str(SRC_DIR))
 
 from fastmcp import FastMCP
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from src.mcp_server.core.config import settings
-from src.mcp_server.tools import register_all_tools
-from src.mcp_server.resources import register_all_resources
-from src.mcp_server.prompts import register_all_prompts
-from src.mcp_server.utils import setup_logging
+from mcp_server.core.config import settings
+from mcp_server.tools import register_all_tools
+from mcp_server.resources import register_all_resources
+from mcp_server.prompts import register_all_prompts
+from mcp_server.utils import setup_logging
 
 # Setup logging
 logger = setup_logging(settings.LOG_LEVEL)
