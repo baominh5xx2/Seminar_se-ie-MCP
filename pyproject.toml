@@ -12,6 +12,7 @@ dependencies = [
     "httpx>=0.25.2",
     "aiofiles>=23.2.1",
     "supabase>=2.0.0",
+    "falkordb>=1.0.0",
 ]
 
 [project.optional-dependencies]

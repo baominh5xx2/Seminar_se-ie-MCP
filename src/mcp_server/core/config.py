@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = Field(default="INFO", description="Logging level")
     
+    # FalkorDB Configuration
+    FALKORDB_HOST: str = Field(default="localhost", description="FalkorDB host")
+    FALKORDB_PORT: int = Field(default=6379, description="FalkorDB port")
+    FALKORDB_USERNAME: Optional[str] = Field(default=None, description="FalkorDB username")
+    FALKORDB_PASSWORD: Optional[str] = Field(default=None, description="FalkorDB password")
+    FALKORDB_DATABASE: str = Field(default="TravelBooking", description="FalkorDB graph database name")
+    FALKORDB_SSL: bool = Field(default=False, description="FalkorDB SSL connection")
+    
     model_config = SettingsConfigDict(
         # Dynamically find .env in project root
         env_file=str(find_project_root() / ".env"),
