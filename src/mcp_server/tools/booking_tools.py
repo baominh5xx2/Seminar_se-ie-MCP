@@ -428,40 +428,40 @@ def register_booking_tools(mcp: FastMCP):
     # ) -> Dict[str, Any]:
     #     """
     #     Tìm kiếm tour packages có sẵn
-        
+    #     
     #     Args:
     #         destination: Điểm đến (optional)
     #         max_price: Giá tối đa (optional)
     #         duration_days: Số ngày (optional)
-            
+    #         
     #     Returns:
     #         Danh sách tour packages
     #     """
     #     try:
     #         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-            
+    #         
     #         query = supabase.table("tour_packages")\
     #             .select("*")\
     #             .eq("is_active", True)
-            
+    #         
     #         if destination:
     #             query = query.ilike("destination", f"%{destination}%")
-            
+    #         
     #         if max_price:
     #             query = query.lte("price", max_price)
-            
+    #         
     #         if duration_days:
     #             query = query.eq("duration_days", duration_days)
-            
+    #         
     #         response = query.execute()
     #         tours = response.data if response.data else []
-            
+    #         
     #         return {
     #             "success": True,
     #             "total": len(tours),
     #             "tours": tours
     #         }
-        
+    #     
     #     except Exception as e:
     #         return {
     #             "success": False,
@@ -472,22 +472,22 @@ def register_booking_tools(mcp: FastMCP):
     # async def get_booking_details(booking_id: str) -> Dict[str, Any]:
     #     """
     #     Lấy chi tiết booking
-        
+    #     
     #     Args:
     #         booking_id: ID của booking
-            
+    #         
     #     Returns:
     #         Chi tiết booking
     #     """
     #     try:
     #         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-            
+    #         
     #         response = supabase.table("bookings")\
     #             .select("*, tour_packages(*), users(*)")\
     #             .eq("booking_id", booking_id)\
     #             .single()\
     #             .execute()
-            
+    #         
     #         if response.data:
     #             return {
     #                 "success": True,
@@ -498,7 +498,7 @@ def register_booking_tools(mcp: FastMCP):
     #                 "success": False,
     #                 "error": "Không tìm thấy booking"
     #             }
-        
+    #     
     #     except Exception as e:
     #         return {
     #             "success": False,
