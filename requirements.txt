@@ -9,3 +9,6 @@ mcp[cli]
 openai-agents
 requests
 pytz
+fastapi>=0.109.0
+uvicorn>=0.27.0
+falkordb>=1.0.0  

@@ -1,7 +1,5 @@
 """Tools package - Register all MCP tools"""
 from fastmcp import FastMCP
-from .chat_tools import register_chat_tools
-from .agent_tools import register_agent_tools
 from .weather_tools import register_weather_tools
 from .flight_tools import register_flight_tools
 from .booking_tools import register_booking_tools
