@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any, List
 from supabase import create_client, Client
 from datetime import datetime
 import os
+import threading
 from dotenv import load_dotenv
 from src.mcp_server.utils.falkordb_client import create_booking_in_falkordb, get_user_bookings_from_falkordb
 
@@ -173,17 +174,17 @@ def register_booking_tools(mcp: FastMCP):
                 → Sau khi user confirm → Gọi tool này
         
         ════════════════════════════════════════════════════════════════════
-        ⚙️ QUY TRÌNH XỬ LÝ (Internal Processing)
+        ⚙️ QUY TRÌNH XỬ LÝ (Internal Processing) - BẮT BUỘC THEO THỨ TỰ
         ════════════════════════════════════════════════════════════════════
         
-        1. Verify user tồn tại trong database
-        2. Lấy thông tin tour package
-        3. Kiểm tra số chỗ còn trống
-        4. Tính tổng tiền (price × number_of_people)
-        5. Tạo booking record trong Supabase
-        6. Cập nhật available_slots của tour
-        7. Lưu vào FalkorDB (graph database)
-        8. Return confirmation đầy đủ
+        1️⃣. Verify user tồn tại trong database
+        2️⃣. Lấy thông tin tour package
+        3️⃣. Kiểm tra số chỗ còn trống
+        4️⃣. Tính tổng tiền (price × number_of_people)
+        5️⃣. TẠO BOOKING RECORD TRONG SUPABASE ← ĐẦU TIÊN
+        6️⃣. Cập nhật available_slots của tour
+        7️⃣. TRẢ THÔNG TIN CHO USER NGAY LẬP TỨC ← ƯU TIÊN CAO
+        8️⃣. LƯU VÀO FALKORDB Ở BACKGROUND ← CUỐI CÙNG
         
         ════════════════════════════════════════════════════════════════════
         ⚠️ ĐIỀU KIỆN BẮT BUỘC
@@ -192,6 +193,7 @@ def register_booking_tools(mcp: FastMCP):
         ✓ User đã CONFIRM booking
         ✓ User đã tồn tại trong hệ thống
         ✓ Có đầy đủ thông tin: số người
+        ✓ PHẢI lưu Supabase TRƯỚC, trả user NGAY, FalkorDB SAU
         
         ════════════════════════════════════════════════════════════════════
         
@@ -225,7 +227,7 @@ def register_booking_tools(mcp: FastMCP):
         try:
             supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
             
-            # 1. Check if user exists
+            # 1️⃣. Verify user tồn tại trong database
             user_response = supabase.table("users")\
                 .select("*")\
                 .eq("phone_number", user_phone)\
@@ -243,7 +245,7 @@ def register_booking_tools(mcp: FastMCP):
             
             user = user_response.data[0]
             
-            # 2. Get package info
+            # 2️⃣. Lấy thông tin tour package
             package_response = supabase.table("tour_packages")\
                 .select("*")\
                 .eq("package_id", package_id)\
@@ -259,17 +261,17 @@ def register_booking_tools(mcp: FastMCP):
             
             package = package_response.data
             
-            # 3. Check available slots
+            # 3️⃣. Kiểm tra số chỗ còn trống
             if package['available_slots'] < number_of_people:
                 return {
                     "success": False,
                     "error": f"Tour chỉ còn {package['available_slots']} chỗ, không đủ cho {number_of_people} người"
                 }
             
-            # 4. Calculate total amount
+            # 4️⃣. Tính tổng tiền (price × number_of_people)
             total_amount = float(package['price']) * number_of_people
             
-            # 5. Create booking
+            # 5️⃣. TẠO BOOKING RECORD TRONG SUPABASE ← BƯỚC QUAN TRỌNG NHẤT
             booking_data = {
                 "user_id": user['user_id'],
                 "package_id": package_id,
@@ -293,53 +295,19 @@ def register_booking_tools(mcp: FastMCP):
             
             booking = booking_response.data[0]
             
-            # 6. Update available slots
+            # 6️⃣. Cập nhật available_slots của tour
             new_slots = package['available_slots'] - number_of_people
             supabase.table("tour_packages")\
                 .update({"available_slots": new_slots})\
                 .eq("package_id", package_id)\
                 .execute()
             
-            # 7. Lưu booking vào FalkorDB với đầy đủ thông tin
-            try:
-                # Đảm bảo lấy email từ user, nếu không có thì dùng chuỗi rỗng
-                user_email = user.get('email', '') or ''
-                
-                falkordb_result = create_booking_in_falkordb(
-                    booking_id=str(booking['booking_id']),
-                    user_name=user.get('full_name', ''),
-                    user_phone=user.get('phone_number', user_phone),
-                    user_email=user_email,
-                    package_id=package_id,
-                    package_name=package['package_name'],
-                    destination=package['destination'],
-                    number_of_people=number_of_people,
-                    total_amount=total_amount,
-                    travel_date='',
-                    package_price=float(package['price']),
-                    duration_days=package['duration_days'],
-                    departure_location=package['departure_location'],
-                    status=booking.get('status', 'pending'),
-                    special_requests=special_requests or '',
-                    contact_name=booking.get('contact_name', ''),
-                    contact_phone=booking.get('contact_phone', user_phone)
-                )
-                
-                if not falkordb_result.get('success'):
-                    # Log error nhưng vẫn trả về success vì đã lưu vào database chính
-                    print(f"⚠️ Warning: Failed to save to FalkorDB: {falkordb_result.get('error')}")
-                else:
-                    print(f"✅ Successfully saved booking to FalkorDB with full details")
-            except Exception as e:
-                # Log error nhưng không fail toàn bộ booking
-                print(f"⚠️ Warning: Exception while saving to FalkorDB: {str(e)}")
-            
-            # 8. Return success with full details
-            return {
+            # 7️⃣. CHUẨN BỊ RESULT ĐỂ TRẢ VỀ USER NGAY LẬP TỨC
+            result = {
                 "success": True,
                 "booking_id": booking['booking_id'],
                 "message": "✅ ĐẶT TOUR THÀNH CÔNG!",
-                "saved_to_falkordb": falkordb_result.get('success', False) if 'falkordb_result' in locals() else False,
+                "saved_to_falkordb": False,  # Chưa lưu FalkorDB lúc này
                 "confirmation": {
                     "booking_id": booking['booking_id'],
                     "user_name": user['full_name'],
@@ -361,6 +329,49 @@ def register_booking_tools(mcp: FastMCP):
                     ]
                 }
             }
+            
+            # 8️⃣. LƯU VÀO FALKORDB Ở BACKGROUND THREAD (KHÔNG BLOCK RESPONSE)
+            def save_to_falkordb_background():
+                """Background task để lưu booking vào FalkorDB - KHÔNG ẢNH HƯỞNG ĐẾN RESPONSE"""
+                try:
+                    print(f"🔄 [Background] Bắt đầu lưu booking {booking['booking_id']} vào FalkorDB...")
+                    
+                    user_email = user.get('email', '') or ''
+                    
+                    falkordb_result = create_booking_in_falkordb(
+                        booking_id=str(booking['booking_id']),
+                        user_name=user.get('full_name', ''),
+                        user_phone=user.get('phone_number', user_phone),
+                        user_email=user_email,
+                        package_id=package_id,
+                        package_name=package['package_name'],
+                        destination=package['destination'],
+                        number_of_people=number_of_people,
+                        total_amount=total_amount,
+                        travel_date='',  # Có thể để trống hoặc lấy từ package
+                        package_price=float(package['price']),
+                        duration_days=package['duration_days'],
+                        departure_location=package['departure_location'],
+                        status=booking.get('status', 'pending'),
+                        special_requests=special_requests or '',
+                        contact_name=booking.get('contact_name', ''),
+                        contact_phone=booking.get('contact_phone', user_phone)
+                    )
+                    
+                    if falkordb_result.get('success'):
+                        print(f"✅ [Background] Successfully saved booking {booking['booking_id']} to FalkorDB")
+                    else:
+                        print(f"⚠️ [Background] Failed to save to FalkorDB: {falkordb_result.get('error')}")
+                        
+                except Exception as e:
+                    print(f"⚠️ [Background] Exception while saving to FalkorDB: {str(e)}")
+            
+            # 🚀 KHỞI ĐỘNG BACKGROUND THREAD - KHÔNG CHỜ ĐỢI
+            falkordb_thread = threading.Thread(target=save_to_falkordb_background, daemon=True)
+            falkordb_thread.start()
+            
+            # 🎯 TRẢ VỀ USER NGAY LẬP TỨC - KHÔNG CHỜ FALKORDB
+            return result
         
         except Exception as e:
             return {
