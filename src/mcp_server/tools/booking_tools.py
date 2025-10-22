@@ -10,6 +10,7 @@ import os
 import threading
 from dotenv import load_dotenv
 from src.mcp_server.utils.falkordb_client import create_booking_in_falkordb, get_user_bookings_from_falkordb
+from src.mcp_server.core.config import settings
 
 load_dotenv()
 
@@ -307,7 +308,7 @@ def register_booking_tools(mcp: FastMCP):
                 "success": True,
                 "booking_id": booking['booking_id'],
                 "message": "✅ ĐẶT TOUR THÀNH CÔNG!",
-                "saved_to_falkordb": False,  # Chưa lưu FalkorDB lúc này
+                "saved_to_falkordb": False,  # Sẽ được cập nhật dựa trên config flag
                 "confirmation": {
                     "booking_id": booking['booking_id'],
                     "user_name": user['full_name'],
@@ -330,45 +331,52 @@ def register_booking_tools(mcp: FastMCP):
                 }
             }
             
-            # 8️⃣. LƯU VÀO FALKORDB Ở BACKGROUND THREAD (KHÔNG BLOCK RESPONSE)
-            def save_to_falkordb_background():
-                """Background task để lưu booking vào FalkorDB - KHÔNG ẢNH HƯỞNG ĐẾN RESPONSE"""
-                try:
-                    print(f"🔄 [Background] Bắt đầu lưu booking {booking['booking_id']} vào FalkorDB...")
-                    
-                    user_email = user.get('email', '') or ''
-                    
-                    falkordb_result = create_booking_in_falkordb(
-                        booking_id=str(booking['booking_id']),
-                        user_name=user.get('full_name', ''),
-                        user_phone=user.get('phone_number', user_phone),
-                        user_email=user_email,
-                        package_id=package_id,
-                        package_name=package['package_name'],
-                        destination=package['destination'],
-                        number_of_people=number_of_people,
-                        total_amount=total_amount,
-                        travel_date='',  # Có thể để trống hoặc lấy từ package
-                        package_price=float(package['price']),
-                        duration_days=package['duration_days'],
-                        departure_location=package['departure_location'],
-                        status=booking.get('status', 'pending'),
-                        special_requests=special_requests or '',
-                        contact_name=booking.get('contact_name', ''),
-                        contact_phone=booking.get('contact_phone', user_phone)
-                    )
-                    
-                    if falkordb_result.get('success'):
-                        print(f"✅ [Background] Successfully saved booking {booking['booking_id']} to FalkorDB")
-                    else:
-                        print(f"⚠️ [Background] Failed to save to FalkorDB: {falkordb_result.get('error')}")
+            # 8️⃣. LƯU VÀO FALKORDB Ở BACKGROUND THREAD (KHÔNG BLOCK RESPONSE) - NẾU ĐƯỢC ENABLE
+            if settings.FALKORDB_SAVE_BOOKINGS:
+                def save_to_falkordb_background():
+                    """Background task để lưu booking vào FalkorDB - KHÔNG ẢNH HƯỞNG ĐẾN RESPONSE"""
+                    try:
+                        print(f"🔄 [Background] Bắt đầu lưu booking {booking['booking_id']} vào FalkorDB...")
                         
-                except Exception as e:
-                    print(f"⚠️ [Background] Exception while saving to FalkorDB: {str(e)}")
-            
-            # 🚀 KHỞI ĐỘNG BACKGROUND THREAD - KHÔNG CHỜ ĐỢI
-            falkordb_thread = threading.Thread(target=save_to_falkordb_background, daemon=True)
-            falkordb_thread.start()
+                        user_email = user.get('email', '') or ''
+                        
+                        falkordb_result = create_booking_in_falkordb(
+                            booking_id=str(booking['booking_id']),
+                            user_name=user.get('full_name', ''),
+                            user_phone=user.get('phone_number', user_phone),
+                            user_email=user_email,
+                            package_id=package_id,
+                            package_name=package['package_name'],
+                            destination=package['destination'],
+                            number_of_people=number_of_people,
+                            total_amount=total_amount,
+                            travel_date='',  # Có thể để trống hoặc lấy từ package
+                            package_price=float(package['price']),
+                            duration_days=package['duration_days'],
+                            departure_location=package['departure_location'],
+                            status=booking.get('status', 'pending'),
+                            special_requests=special_requests or '',
+                            contact_name=booking.get('contact_name', ''),
+                            contact_phone=booking.get('contact_phone', user_phone)
+                        )
+                        
+                        if falkordb_result.get('success'):
+                            print(f"✅ [Background] Successfully saved booking {booking['booking_id']} to FalkorDB")
+                        else:
+                            print(f"⚠️ [Background] Failed to save to FalkorDB: {falkordb_result.get('error')}")
+                            
+                    except Exception as e:
+                        print(f"⚠️ [Background] Exception while saving to FalkorDB: {str(e)}")
+                
+                # 🚀 KHỞI ĐỘNG BACKGROUND THREAD - KHÔNG CHỜ ĐỢI
+                falkordb_thread = threading.Thread(target=save_to_falkordb_background, daemon=True)
+                falkordb_thread.start()
+                
+                # Cập nhật flag trong result
+                result["saved_to_falkordb"] = True
+            else:
+                print(f"ℹ️ [Config] FalkorDB saving is disabled, skipping background save for booking {booking['booking_id']}")
+                result["saved_to_falkordb"] = False
             
             # 🎯 TRẢ VỀ USER NGAY LẬP TỨC - KHÔNG CHỜ FALKORDB
             return result
