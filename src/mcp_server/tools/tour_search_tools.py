@@ -134,13 +134,10 @@ class TourPackageSearchService:
             results.sort(key=lambda x: x.get('similarity_score', 0), reverse=True)
             results = results[:limit]
             
-            logger.info(f"✅ Vector search found {len(results)} packages (similarity > 0.3)")
+            logger.info(f"✅ Vector search found {len(results)} packages")
             
-            # Apply filters
-            if filters and results:
-                before_filter = len(results)
-                results = self._apply_filters(results, filters)
-                logger.info(f"🔧 Filters applied: {before_filter} -> {len(results)} packages")
+            # Note: Filters removed - return all semantic search results
+            # Let the agent decide which packages are most relevant
             
             return results
             
@@ -185,7 +182,7 @@ class TourPackageSearchService:
         
         Args:
             user_message: User query (e.g., "Tôi muốn đi Đà Lạt")
-            filters: Optional filters (price, duration, destination)
+            filters: Optional filters (IGNORED - returns all semantic matches)
             limit: Number of results
             
         Returns:
@@ -197,8 +194,8 @@ class TourPackageSearchService:
             # Generate embedding
             embedding = self._generate_embedding(user_message)
             
-            # Vector search
-            results = self._search_tours_by_vector(embedding, filters, limit)
+            # Vector search (filters ignored, return pure semantic results)
+            results = self._search_tours_by_vector(embedding, filters=None, limit=limit)
             
             logger.info(f"✅ Search completed: {len(results)} packages found")
             return results
@@ -235,17 +232,14 @@ def register_tour_search_tools(mcp: FastMCP):
         The search uses:
         - OpenAI text-embedding-3-small model (1536 dimensions)
         - Cosine similarity matching
-        - Optional filters: price, duration, destination
+        - NO FILTERS APPLIED - returns pure semantic matches for agent to decide
         
         Args:
             user_message (str): User's search query in Vietnamese or English.
                 Example: "Tôi muốn đi Đà Lạt", "beach tour", "mountain hiking"
-            max_price (float, optional): Maximum price filter in VND.
-                Example: 5000000
-            duration (int, optional): Duration filter in days.
-                Example: 3
-            destination (str, optional): Destination filter.
-                Example: "Đà Nẵng", "Hội An"
+            max_price (float, optional): IGNORED - parameter kept for compatibility
+            duration (int, optional): IGNORED - parameter kept for compatibility
+            destination (str, optional): IGNORED - parameter kept for compatibility
             limit (int, optional): Maximum number of results. Default: 10.
                 Example: 5
         
@@ -291,22 +285,13 @@ def register_tour_search_tools(mcp: FastMCP):
         try:
             logger.info(f"📞 MCP Tool Call: search_tour_packages")
             logger.info(f"   Query: {user_message[:100]}")
-            logger.info(f"   Filters: max_price={max_price}, duration={duration}, destination={destination}")
+            logger.info(f"   Filters: IGNORED (semantic search only)")
             logger.info(f"   Limit: {limit}")
             
-            # Build filters dict
-            filters = {}
-            if max_price:
-                filters["max_price"] = max_price
-            if duration:
-                filters["duration"] = duration
-            if destination:
-                filters["destination"] = destination
-            
-            # Search packages
+            # Search packages (no filters applied)
             packages = await tour_package_search_service.search_tour_packages(
                 user_message=user_message,
-                filters=filters if filters else None,
+                filters=None,
                 limit=limit
             )
             
