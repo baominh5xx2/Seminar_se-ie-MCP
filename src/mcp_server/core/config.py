@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     FALKORDB_PASSWORD: Optional[str] = Field(default=None, description="FalkorDB password")
     FALKORDB_DATABASE: str = Field(default="TravelBooking", description="FalkorDB graph database name")
     FALKORDB_SSL: bool = Field(default=False, description="FalkorDB SSL connection")
+    FALKORDB_SAVE_BOOKINGS: bool = Field(default=False, description="Enable saving bookings to FalkorDB")
     
     model_config = SettingsConfigDict(
         # Dynamically find .env in project root
