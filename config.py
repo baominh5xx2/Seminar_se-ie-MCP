@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     
     # OpenAI (optional)
     OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4-turbo-preview"
+    OPENAI_MODEL: str = "gpt-5-mini"
     
     # Logging
     LOG_LEVEL: str = "INFO"

@@ -40,7 +40,11 @@ class Settings(BaseSettings):
     
     # OpenAI Configuration
     OPENAI_API_KEY: Optional[str] = Field(default=None, description="OpenAI API key")
-    OPENAI_MODEL: str = Field(default="gpt-4-turbo-preview", description="OpenAI model")
+    OPENAI_MODEL: str = Field(default="gpt-5-mini", description="OpenAI model")
+    
+    # Supabase Configuration (for tour search and booking)
+    SUPABASE_URL: Optional[str] = Field(default=None, description="Supabase project URL")
+    SUPABASE_KEY: Optional[str] = Field(default=None, description="Supabase API key")
     
     # Weather API Configuration
     WEATHER_API_KEY: str = Field(

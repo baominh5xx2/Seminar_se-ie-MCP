@@ -1,5 +1,6 @@
 """Resources package - Register all MCP resources"""
 from fastmcp import FastMCP
+from .falkordb import register_falkordb_resources
 
 
 def register_all_resources(mcp: FastMCP):
@@ -9,8 +10,7 @@ def register_all_resources(mcp: FastMCP):
     Args:
         mcp: FastMCP server instance
     """
-    # No resources registered yet
-    pass
+    register_falkordb_resources(mcp)
 
-__all__ = ["register_all_resources"]
+__all__ = ["register_all_resources", "register_falkordb_resources"]
 
