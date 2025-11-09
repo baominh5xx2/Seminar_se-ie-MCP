@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     # Supabase Configuration (for tour search and booking)
     SUPABASE_URL: Optional[str] = Field(default=None, description="Supabase project URL")
     SUPABASE_KEY: Optional[str] = Field(default=None, description="Supabase API key")
+
+    # Mem0 Configuration
+    MEM0_API_KEY: Optional[str] = Field(default=None, description="Mem0 API key")
     
     # Weather API Configuration
     WEATHER_API_KEY: str = Field(
